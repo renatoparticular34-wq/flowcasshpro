@@ -5,4 +5,4 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
-console.log('✅ Supabase cliente inicializado!');
+console.log('✅ Supabase cliente inicializado! (v2 - 27/01/2026)');
