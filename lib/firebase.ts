@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { initializeFirestore } from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
     apiKey: "AIzaSyAcFykrJZ2YTlQ7j392eTgwe1l3MrKZ01E",
@@ -11,13 +11,23 @@ const firebaseConfig = {
     appId: "1:59584743047:web:dc238ec70fd8a62d271a22"
 };
 
-// Inicializa o App
-const app = initializeApp(firebaseConfig);
+console.log("🔥 Firebase: Iniciando configuração...");
 
-// Inicializa a Autenticação
-export const auth = getAuth(app);
+let app;
+let auth;
+let db;
 
-// Inicializa o Banco (com a correção para o erro de Offline)
-export const db = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
-});
+try {
+    app = initializeApp(firebaseConfig);
+    console.log("✅ Firebase App inicializado com sucesso!");
+
+    auth = getAuth(app);
+    console.log("✅ Firebase Auth inicializado!");
+
+    db = getFirestore(app);
+    console.log("✅ Firestore inicializado!");
+} catch (error) {
+    console.error("❌ ERRO CRÍTICO ao inicializar Firebase:", error);
+}
+
+export { auth, db };
