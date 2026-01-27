@@ -6,9 +6,6 @@ import {
     deleteDoc,
     doc,
     updateDoc,
-    query,
-    orderBy,
-    where,
     setDoc,
     getDoc
 } from 'firebase/firestore';
@@ -25,15 +22,19 @@ export const firebaseService = {
     // --- Transactions ---
 
     async getTransactions(): Promise<Transaction[]> {
+        console.log("📦 Buscando transações...");
         try {
-            if (!auth.currentUser) return [];
+            if (!auth.currentUser) {
+                console.log("⚠️ Usuário não autenticado, retornando []");
+                return [];
+            }
 
-            const q = query(
-                getUserSubcollection("transactions"),
-                orderBy("date", "desc")
-            );
+            const colRef = getUserSubcollection("transactions");
+            console.log("📂 Coleção:", colRef.path);
 
-            const querySnapshot = await getDocs(q);
+            const querySnapshot = await getDocs(colRef);
+            console.log("✅ Transações encontradas:", querySnapshot.size);
+
             return querySnapshot.docs.map(doc => {
                 const data = doc.data();
                 return {
@@ -48,7 +49,7 @@ export const firebaseService = {
                 } as Transaction;
             });
         } catch (error) {
-            console.error("Error fetching transactions:", error);
+            console.error("❌ Erro ao buscar transações:", error);
             return [];
         }
     },
@@ -90,15 +91,18 @@ export const firebaseService = {
     // --- Accounts ---
 
     async getAccounts(): Promise<Account[]> {
+        console.log("📦 Buscando contas...");
         try {
-            if (!auth.currentUser) return [];
+            if (!auth.currentUser) {
+                console.log("⚠️ Usuário não autenticado, retornando []");
+                return [];
+            }
 
-            const q = query(getUserSubcollection("accounts"), orderBy("name"));
-            const querySnapshot = await getDocs(q);
+            const colRef = getUserSubcollection("accounts");
+            console.log("📂 Coleção:", colRef.path);
 
-            // If no accounts exist (first login?), we might want to create defaults,
-            // but for now let's just return what's there.
-            // The frontend might handle seeding default accounts.
+            const querySnapshot = await getDocs(colRef);
+            console.log("✅ Contas encontradas:", querySnapshot.size);
 
             return querySnapshot.docs.map(doc => {
                 const data = doc.data();
@@ -110,19 +114,21 @@ export const firebaseService = {
                 };
             });
         } catch (error) {
-            console.error("Error fetching accounts:", error);
+            console.error("❌ Erro ao buscar contas:", error);
             return [];
         }
     },
 
     async createAccount(name: string, type: AccountType): Promise<Account | null> {
+        console.log("➕ Criando conta:", name, type);
         try {
             const col = getUserSubcollection("accounts");
             const payload = { name, type };
             const docRef = await addDoc(col, payload);
+            console.log("✅ Conta criada com ID:", docRef.id);
             return { id: docRef.id, ...payload };
         } catch (error) {
-            console.error("Error creating account:", error);
+            console.error("❌ Erro ao criar conta:", error);
             return null;
         }
     },
@@ -153,6 +159,7 @@ export const firebaseService = {
     // --- Settings ---
 
     async getSettings(): Promise<AppSettings> {
+        console.log("📦 Buscando configurações...");
         const defaultSettings: AppSettings = {
             companyName: 'Minha Empresa',
             initialBalance: 0,
@@ -163,10 +170,16 @@ export const firebaseService = {
         };
 
         try {
-            if (!auth.currentUser) return defaultSettings;
+            if (!auth.currentUser) {
+                console.log("⚠️ Usuário não autenticado, retornando padrão");
+                return defaultSettings;
+            }
 
             const docRef = doc(db, "users", auth.currentUser.uid, "settings", "main");
+            console.log("📂 Documento:", docRef.path);
+
             const docSnap = await getDoc(docRef);
+            console.log("✅ Documento existe?", docSnap.exists());
 
             if (docSnap.exists()) {
                 return docSnap.data() as AppSettings;
@@ -174,7 +187,7 @@ export const firebaseService = {
                 return defaultSettings;
             }
         } catch (error) {
-            console.error("Error fetching settings:", error);
+            console.error("❌ Erro ao buscar configurações:", error);
             return defaultSettings;
         }
     },
