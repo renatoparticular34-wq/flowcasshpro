@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
-import { Account, AccountType, AppSettings } from '../types';
+
+import React, { useState, useEffect } from 'react';
+import { Account, AccountType, AppSettings, Transaction } from '../types';
 import { Save, AlertTriangle, Building2, Trash2 } from 'lucide-react';
 
 interface ChartOfAccountsProps {
@@ -13,6 +14,11 @@ interface ChartOfAccountsProps {
 const ChartOfAccounts: React.FC<ChartOfAccountsProps> = ({ accounts, settings, transactions, onSave }) => {
   const [localAccounts, setLocalAccounts] = useState<Account[]>(accounts);
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
+
+  useEffect(() => {
+    setLocalAccounts(accounts);
+    setLocalSettings(settings);
+  }, [accounts, settings]);
 
   const handleAccountChange = (id: string, newName: string) => {
     setLocalAccounts(prev => prev.map(a => a.id === id ? { ...a, name: newName } : a));

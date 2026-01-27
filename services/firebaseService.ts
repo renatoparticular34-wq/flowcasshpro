@@ -139,6 +139,17 @@ export const firebaseService = {
         }
     },
 
+    async deleteAccount(id: string): Promise<boolean> {
+        try {
+            if (!auth.currentUser) return false;
+            await deleteDoc(doc(db, "users", auth.currentUser.uid, "accounts", id));
+            return true;
+        } catch (error) {
+            console.error("Error deleting account:", error);
+            return false;
+        }
+    },
+
     // --- Settings ---
 
     async getSettings(): Promise<AppSettings> {

@@ -14,6 +14,8 @@ import TransactionForm from './components/TransactionForm';
 import Login from './components/Login';
 import { Loader2 } from 'lucide-react';
 
+import { INITIAL_ACCOUNTS } from './services/mockData';
+
 const FlowCashApp: React.FC = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -46,8 +48,22 @@ const FlowCashApp: React.FC = () => {
         firebaseService.getSettings()
       ]);
       console.log('Dados carregados:', { txs: txs.length, accs: accs.length, sets });
+
+      let finalAccounts = accs;
+
+      // Seeding: Se não houver contas, criar as padrão
+      if (accs.length === 0) {
+        console.log('Criando contas padrão...');
+        const createdAccounts = [];
+        for (const acc of INITIAL_ACCOUNTS) {
+          const newAcc = await firebaseService.createAccount(acc.name, acc.type);
+          if (newAcc) createdAccounts.push(newAcc);
+        }
+        finalAccounts = createdAccounts;
+      }
+
       setTransactions(txs);
-      setAccounts(accs);
+      setAccounts(finalAccounts);
       setSettings(sets);
 
       // Clear temporary balance when user logs in
@@ -125,7 +141,15 @@ const FlowCashApp: React.FC = () => {
   const handleUpdateAccounts = async (newAccounts: Account[], newSettings: AppSettings) => {
     await firebaseService.updateSettings(newSettings);
 
-    // Process account updates
+    // 1. Handle Deletions: Check accounts present in state but missing in newAccounts
+    const newIds = new Set(newAccounts.map(a => a.id));
+    const toDelete = accounts.filter(a => !newIds.has(a.id) && !a.id.startsWith('temp_')); // Only delete real IDs that are missing
+
+    for (const acc of toDelete) {
+      await firebaseService.deleteAccount(acc.id);
+    }
+
+    // 2. Handle Creations and Updates
     for (const acc of newAccounts) {
       if (acc.id.startsWith('temp_')) {
         await firebaseService.createAccount(acc.name, acc.type);
@@ -138,7 +162,7 @@ const FlowCashApp: React.FC = () => {
     }
 
     setSettings(newSettings);
-    loadData();
+    loadData(); // This will fetch the new list and trigger re-renders
   };
 
   const handleUpdateProfile = async (newSettings: AppSettings) => {
