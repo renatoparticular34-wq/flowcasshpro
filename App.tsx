@@ -41,34 +41,48 @@ const FlowCashApp: React.FC = () => {
 
   const [loadingError, setLoadingError] = useState('');
 
+
   const loadData = async () => {
     if (!user) return;
     setDataLoading(true);
     setLoadingError('');
 
+    // Helper para adicionar timeout a uma Promise
+    const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<T>((resolve) => setTimeout(() => {
+          console.warn(`⏱️ Timeout após ${ms}ms, usando fallback`);
+          resolve(fallback);
+        }, ms))
+      ]);
+    };
+
     try {
       console.log('🔄 Iniciando carregamento de dados...');
 
+      // Buscar dados com timeout de 10 segundos cada
       const [txs, accs, sets] = await Promise.all([
-        firebaseService.getTransactions(),
-        firebaseService.getAccounts(),
-        firebaseService.getSettings()
+        withTimeout(firebaseService.getTransactions(), 10000, []),
+        withTimeout(firebaseService.getAccounts(), 10000, []),
+        withTimeout(firebaseService.getSettings(), 10000, {
+          companyName: 'Minha Empresa',
+          initialBalance: 0,
+          email: '',
+          phone: '',
+          address: '',
+          document: ''
+        })
       ]);
 
       console.log('✅ Dados carregados:', { txs: txs.length, accs: accs.length, sets });
 
+      // Se não houver contas, usar as padrão localmente (sem salvar no banco por enquanto)
       let finalAccounts = accs;
-
-      // Seeding: Se não houver contas, criar as padrão
       if (accs.length === 0) {
-        console.log('🌱 Criando contas padrão...');
-        const createdAccounts = [];
-        for (const acc of INITIAL_ACCOUNTS) {
-          const newAcc = await firebaseService.createAccount(acc.name, acc.type);
-          if (newAcc) createdAccounts.push(newAcc);
-        }
-        finalAccounts = createdAccounts;
-        console.log('✅ Contas padrão criadas:', finalAccounts.length);
+        console.log('ℹ️ Nenhuma conta encontrada, usando contas padrão locais');
+        // Usar contas locais para o usuário poder usar o app
+        finalAccounts = INITIAL_ACCOUNTS;
       }
 
       setTransactions(txs);
@@ -81,11 +95,21 @@ const FlowCashApp: React.FC = () => {
       setTempBalanceYear(new Date().getFullYear());
     } catch (error: any) {
       console.error('❌ Erro ao carregar dados:', error);
-      setLoadingError(error.message || 'Erro ao carregar dados.');
+      // Em caso de erro, usar dados locais para não travar o app
+      setAccounts(INITIAL_ACCOUNTS);
+      setSettings({
+        companyName: 'Minha Empresa',
+        initialBalance: 0,
+        email: '',
+        phone: '',
+        address: '',
+        document: ''
+      });
     } finally {
       setDataLoading(false);
     }
   };
+
 
 
 
