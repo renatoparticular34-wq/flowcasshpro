@@ -156,6 +156,7 @@ export const firebaseService = {
         }
     },
 
+
     // --- Settings ---
 
     async getSettings(): Promise<AppSettings> {
@@ -175,15 +176,18 @@ export const firebaseService = {
                 return defaultSettings;
             }
 
-            const docRef = doc(db, "users", auth.currentUser.uid, "settings", "main");
-            console.log("📂 Documento:", docRef.path);
+            // Usar getDocs em vez de getDoc para contornar bug de "offline"
+            const settingsCol = collection(db, "users", auth.currentUser.uid, "settings");
+            console.log("📂 Coleção:", settingsCol.path);
 
-            const docSnap = await getDoc(docRef);
-            console.log("✅ Documento existe?", docSnap.exists());
+            const querySnapshot = await getDocs(settingsCol);
+            console.log("✅ Documentos de settings encontrados:", querySnapshot.size);
 
-            if (docSnap.exists()) {
-                return docSnap.data() as AppSettings;
+            if (!querySnapshot.empty) {
+                const firstDoc = querySnapshot.docs[0];
+                return firstDoc.data() as AppSettings;
             } else {
+                console.log("ℹ️ Nenhuma config encontrada, retornando padrão");
                 return defaultSettings;
             }
         } catch (error) {
@@ -191,6 +195,7 @@ export const firebaseService = {
             return defaultSettings;
         }
     },
+
 
     async updateSettings(settings: AppSettings): Promise<boolean> {
         try {
