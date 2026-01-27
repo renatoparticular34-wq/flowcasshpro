@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { auth } from '../lib/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { KeyRound, Mail, Loader2, ArrowRight } from 'lucide-react';
 
 interface LoginProps {
@@ -10,6 +10,7 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [isResetting, setIsResetting] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -24,7 +25,11 @@ const Login: React.FC<LoginProps> = () => {
     setMessage('');
 
     try {
-      if (isLogin) {
+      if (isResetting) {
+        await sendPasswordResetEmail(auth, email);
+        setMessage('Email de redefinição de senha enviado! Verifique sua caixa de entrada.');
+        setIsResetting(false);
+      } else if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -45,8 +50,10 @@ const Login: React.FC<LoginProps> = () => {
         setError('Este email já está em uso');
       } else if (err.code === 'auth/weak-password') {
         setError('A senha deve ter pelo menos 6 caracteres');
+      } else if (err.code === 'auth/missing-email') {
+        setError('Por favor, digite seu email.');
       } else {
-        setError('Ocorreu um erro na autenticação: ' + err.message);
+        setError('Ocorreu um erro: ' + err.message);
       }
     } finally {
       setLoading(false);
@@ -61,10 +68,12 @@ const Login: React.FC<LoginProps> = () => {
             <KeyRound className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">
-            {isLogin ? 'Bem-vindo de volta' : 'Crie sua conta'}
+            {isResetting ? 'Redefinir Senha' : (isLogin ? 'Bem-vindo de volta' : 'Crie sua conta')}
           </h1>
           <p className="text-slate-400">
-            {isLogin ? 'Faça login para acessar o sistema' : 'Comece a gerenciar seu fluxo de caixa'}
+            {isResetting
+              ? 'Digite seu email para receber o link de redefinição'
+              : (isLogin ? 'Faça login para acessar o sistema' : 'Comece a gerenciar seu fluxo de caixa')}
           </p>
         </div>
 
@@ -81,7 +90,7 @@ const Login: React.FC<LoginProps> = () => {
         )}
 
         <form onSubmit={handleAuth} className="space-y-4">
-          {!isLogin && (
+          {!isLogin && !isResetting && (
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1">Nome da Empresa/Usuário</label>
               <div className="relative">
@@ -112,21 +121,34 @@ const Login: React.FC<LoginProps> = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Senha</label>
-            <div className="relative">
-              <KeyRound className="w-5 h-5 text-slate-500 absolute left-3 top-3.5" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-slate-600"
-                placeholder="••••••••"
-                required
-                minLength={6}
-              />
+          {!isResetting && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Senha</label>
+              <div className="relative">
+                <KeyRound className="w-5 h-5 text-slate-500 absolute left-3 top-3.5" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-slate-600"
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                />
+              </div>
+              {isLogin && (
+                <div className="flex justify-end mt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setIsResetting(true); setError(''); setMessage(''); }}
+                    className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                  >
+                    Esqueci minha senha
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           <button
             type="submit"
@@ -137,20 +159,31 @@ const Login: React.FC<LoginProps> = () => {
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
-                {isLogin ? 'Entrar' : 'Criar Conta'}
+                {isResetting ? 'Enviar Link' : (isLogin ? 'Entrar' : 'Criar Conta')}
                 <ArrowRight className="w-5 h-5" />
               </>
             )}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-slate-400 hover:text-white text-sm transition-colors"
-          >
-            {isLogin ? 'Não tem uma conta? Cadastre-se' : 'Já tem uma conta? Faça login'}
-          </button>
+        <div className="mt-6 text-center space-y-2">
+          {isResetting ? (
+            <button
+              type="button"
+              onClick={() => { setIsResetting(false); setError(''); setMessage(''); }}
+              className="text-slate-400 hover:text-white text-sm transition-colors"
+            >
+              Voltar para o Login
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setIsLogin(!isLogin); setError(''); setMessage(''); }}
+              className="text-slate-400 hover:text-white text-sm transition-colors"
+            >
+              {isLogin ? 'Não tem uma conta? Cadastre-se' : 'Já tem uma conta? Faça login'}
+            </button>
+          )}
         </div>
       </div>
     </div>
