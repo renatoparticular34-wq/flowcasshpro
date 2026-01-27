@@ -38,15 +38,28 @@ const FlowCashApp: React.FC = () => {
   const [tempBalanceMonth, setTempBalanceMonth] = useState<number>(new Date().getMonth() + 1);
   const [tempBalanceYear, setTempBalanceYear] = useState<number>(new Date().getFullYear());
 
+
+  const [loadingError, setLoadingError] = useState('');
+
   const loadData = async () => {
     if (!user) return;
     setDataLoading(true);
+    setLoadingError('');
+
+    // Timeout Promise
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("O carregamento demorou muito. Verifique sua conexão ou as configurações do Firebase.")), 15000)
+    );
+
     try {
-      const [txs, accs, sets] = await Promise.all([
+      const loadPromise = Promise.all([
         firebaseService.getTransactions(),
         firebaseService.getAccounts(),
         firebaseService.getSettings()
       ]);
+
+      const [txs, accs, sets] = await Promise.race([loadPromise, timeout]) as [Transaction[], Account[], AppSettings];
+
       console.log('Dados carregados:', { txs: txs.length, accs: accs.length, sets });
 
       let finalAccounts = accs;
@@ -70,12 +83,14 @@ const FlowCashApp: React.FC = () => {
       setTempInitialBalance(undefined);
       setTempBalanceMonth(new Date().getMonth() + 1);
       setTempBalanceYear(new Date().getFullYear());
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load data:', error);
+      setLoadingError(error.message || 'Erro ao carregar dados.');
     } finally {
       setDataLoading(false);
     }
   };
+
 
   useEffect(() => {
     if (user) {
@@ -201,11 +216,35 @@ const FlowCashApp: React.FC = () => {
     return <Login onLogin={() => { }} />;
   }
 
+
   if (dataLoading && transactions.length === 0) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center flex-col gap-4">
         <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
         <p className="text-slate-400 text-sm">Carregando seus dados...</p>
+      </div>
+    );
+  }
+
+  if (loadingError) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-slate-800 p-8 rounded-2xl max-w-md w-full border border-rose-900/50 text-center">
+          <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Loader2 className="w-8 h-8 text-rose-500" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">Ops! Algo deu errado.</h2>
+          <p className="text-rose-200/80 mb-6 text-sm">{loadingError}</p>
+          <div className="text-xs text-slate-500 mb-6 bg-slate-900/50 p-3 rounded border border-slate-700">
+            Dica: Verifique se as Variáveis de Ambiente foram configuradas corretamente no Netlify.
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+          >
+            Tentar Novamente
+          </button>
+        </div>
       </div>
     );
   }
