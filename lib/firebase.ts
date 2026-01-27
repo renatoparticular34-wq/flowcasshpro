@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 
 const firebaseConfig = {
     apiKey: "AIzaSyAcFykrJZ2YTlQ7j392eTgwe1l3MrKZ01E",
@@ -13,9 +13,9 @@ const firebaseConfig = {
 
 console.log("🔥 Firebase: Iniciando configuração...");
 
-let app;
-let auth;
-let db;
+let app: any;
+let auth: any;
+let db: any;
 
 try {
     app = initializeApp(firebaseConfig);
@@ -24,8 +24,11 @@ try {
     auth = getAuth(app);
     console.log("✅ Firebase Auth inicializado!");
 
-    db = getFirestore(app);
-    console.log("✅ Firestore inicializado!");
+    // Inicializar Firestore SEM cache offline (para evitar problemas de "offline")
+    db = initializeFirestore(app, {
+        experimentalForceLongPolling: true, // Força polling em vez de WebSocket
+    });
+    console.log("✅ Firestore inicializado com Long Polling!");
 } catch (error) {
     console.error("❌ ERRO CRÍTICO ao inicializar Firebase:", error);
 }
