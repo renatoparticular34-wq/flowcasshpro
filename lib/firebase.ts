@@ -1,25 +1,23 @@
-
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID
+    apiKey: "AIzaSyAcFykrJZ2YTlQ7j392eTgwe1l3MrKZ01E",
+    authDomain: "flowcasshpro.firebaseapp.com",
+    projectId: "flowcasshpro",
+    storageBucket: "flowcasshpro.firebasestorage.app",
+    messagingSenderId: "59584743047",
+    appId: "1:59584743047:web:dc238ec70fd8a62d271a22"
 };
 
-// Validação de segurança básica para debug
-if (!firebaseConfig.apiKey) {
-    console.error("🔥 CRITICAL ERROR: Firebase Config is missing!");
-    console.error("Make sure you have set the environment variables in Netlify/Vercel (VITE_FIREBASE_API_KEY, etc).");
-} else {
-    console.log("✅ Firebase Config found. Service initializing...");
-}
-
+// Inicializa o App
 const app = initializeApp(firebaseConfig);
+
+// Inicializa a Autenticação
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Inicializa o Banco (com a correção para o erro de Offline)
+export const db = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+});
