@@ -1,7 +1,5 @@
-
 import React, { useState } from 'react';
-import { auth } from '../lib/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
+import { supabase } from '../lib/supabase';
 import { KeyRound, Mail, Loader2, ArrowRight } from 'lucide-react';
 
 interface LoginProps {
@@ -26,32 +24,46 @@ const Login: React.FC<LoginProps> = () => {
 
     try {
       if (isResetting) {
-        await sendPasswordResetEmail(auth, email);
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin,
+        });
+        if (error) throw error;
         setMessage('Email de redefinição de senha enviado! Verifique sua caixa de entrada.');
         setIsResetting(false);
       } else if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        console.log('✅ Login realizado com sucesso!');
       } else {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        // Update profile with full name
-        if (userCredential.user) {
-          await updateProfile(userCredential.user, {
-            displayName: fullName
-          });
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+            },
+          },
+        });
+        if (error) throw error;
+
+        if (data.user && !data.session) {
+          setMessage('Verifique seu email para confirmar o cadastro!');
+        } else {
+          setMessage('Cadastro realizado com sucesso!');
         }
-        setMessage('Cadastro realizado com sucesso!');
         setIsLogin(true);
       }
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+      if (err.message?.includes('Invalid login credentials')) {
         setError('Email ou senha inválidos');
-      } else if (err.code === 'auth/email-already-in-use') {
+      } else if (err.message?.includes('already registered')) {
         setError('Este email já está em uso');
-      } else if (err.code === 'auth/weak-password') {
+      } else if (err.message?.includes('Password should be')) {
         setError('A senha deve ter pelo menos 6 caracteres');
-      } else if (err.code === 'auth/missing-email') {
-        setError('Por favor, digite seu email.');
       } else {
         setError('Ocorreu um erro: ' + err.message);
       }

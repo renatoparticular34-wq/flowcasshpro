@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Transaction, Account, AppSettings } from './types';
-import { firebaseService } from './services/firebaseService';
+import { supabaseService } from './services/supabaseService';
 import { AuthProvider, useAuth } from './components/AuthProvider';
+
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import Transactions from './components/Transactions';
@@ -63,9 +64,9 @@ const FlowCashApp: React.FC = () => {
 
       // Buscar dados com timeout de 10 segundos cada
       const [txs, accs, sets] = await Promise.all([
-        withTimeout(firebaseService.getTransactions(), 10000, []),
-        withTimeout(firebaseService.getAccounts(), 10000, []),
-        withTimeout(firebaseService.getSettings(), 10000, {
+        withTimeout(supabaseService.getTransactions(), 10000, []),
+        withTimeout(supabaseService.getAccounts(), 10000, []),
+        withTimeout(supabaseService.getSettings(), 10000, {
           companyName: 'Minha Empresa',
           initialBalance: 0,
           email: '',
@@ -87,7 +88,7 @@ const FlowCashApp: React.FC = () => {
         for (const acc of INITIAL_ACCOUNTS) {
           try {
             // Timeout de 5 segundos por conta
-            const createPromise = firebaseService.createAccount(acc.name, acc.type);
+            const createPromise = supabaseService.createAccount(acc.name, acc.type);
             const timeoutPromise = new Promise<null>((resolve) =>
               setTimeout(() => resolve(null), 5000)
             );
@@ -163,7 +164,7 @@ const FlowCashApp: React.FC = () => {
       type: account.type
     } as any;
 
-    const created = await firebaseService.createTransaction(newTxData);
+    const created = await supabaseService.createTransaction(newTxData);
     if (created) {
       setTransactions([created, ...transactions]);
       setShowAddForm(false);
@@ -182,7 +183,7 @@ const FlowCashApp: React.FC = () => {
       type: account.type
     };
 
-    const success = await firebaseService.updateTransaction(updatedTx);
+    const success = await supabaseService.updateTransaction(updatedTx);
     if (success) {
       setTransactions(transactions.map(t => t.id === updatedTx.id ? updatedTx : t));
       setEditingTransaction(undefined);
@@ -197,7 +198,7 @@ const FlowCashApp: React.FC = () => {
 
   const handleDeleteTransaction = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este lançamento?')) {
-      const success = await firebaseService.deleteTransaction(id);
+      const success = await supabaseService.deleteTransaction(id);
       if (success) {
         setTransactions(transactions.filter(t => t.id !== id));
       }
@@ -205,24 +206,24 @@ const FlowCashApp: React.FC = () => {
   };
 
   const handleUpdateAccounts = async (newAccounts: Account[], newSettings: AppSettings) => {
-    await firebaseService.updateSettings(newSettings);
+    await supabaseService.updateSettings(newSettings);
 
     // 1. Handle Deletions: Check accounts present in state but missing in newAccounts
     const newIds = new Set(newAccounts.map(a => a.id));
     const toDelete = accounts.filter(a => !newIds.has(a.id) && !a.id.startsWith('temp_')); // Only delete real IDs that are missing
 
     for (const acc of toDelete) {
-      await firebaseService.deleteAccount(acc.id);
+      await supabaseService.deleteAccount(acc.id);
     }
 
     // 2. Handle Creations and Updates
     for (const acc of newAccounts) {
       if (acc.id.startsWith('temp_')) {
-        await firebaseService.createAccount(acc.name, acc.type);
+        await supabaseService.createAccount(acc.name, acc.type);
       } else {
         const original = accounts.find(a => a.id === acc.id);
         if (original && original.name !== acc.name) {
-          await firebaseService.updateAccount(acc);
+          await supabaseService.updateAccount(acc);
         }
       }
     }
@@ -234,7 +235,7 @@ const FlowCashApp: React.FC = () => {
   const handleUpdateProfile = async (newSettings: AppSettings) => {
     try {
       console.log('💾 Salvando perfil:', newSettings.companyName);
-      const success = await firebaseService.updateSettings(newSettings);
+      const success = await supabaseService.updateSettings(newSettings);
       if (success) {
         console.log('✅ Perfil salvo com sucesso');
 
