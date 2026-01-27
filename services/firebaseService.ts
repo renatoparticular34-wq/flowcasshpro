@@ -54,16 +54,25 @@ export const firebaseService = {
         }
     },
 
+
     async createTransaction(transaction: Omit<Transaction, 'id'>): Promise<Transaction | null> {
+        console.log("➕ Criando transação:", transaction);
         try {
+            if (!auth.currentUser) {
+                console.error("❌ Usuário não autenticado!");
+                return null;
+            }
             const col = getUserSubcollection("transactions");
+            console.log("📂 Coleção:", col.path);
             const docRef = await addDoc(col, transaction);
+            console.log("✅ Transação criada com ID:", docRef.id);
             return { ...transaction, id: docRef.id };
         } catch (error) {
-            console.error("Error creating transaction:", error);
+            console.error("❌ Erro ao criar transação:", error);
             return null;
         }
     },
+
 
     async deleteTransaction(id: string): Promise<boolean> {
         try {

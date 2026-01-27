@@ -75,15 +75,45 @@ const FlowCashApp: React.FC = () => {
         })
       ]);
 
+
       console.log('✅ Dados carregados:', { txs: txs.length, accs: accs.length, sets });
 
-      // Se não houver contas, usar as padrão localmente (sem salvar no banco por enquanto)
+      // Se não houver contas, tentar criar no Firebase
       let finalAccounts = accs;
       if (accs.length === 0) {
-        console.log('ℹ️ Nenhuma conta encontrada, usando contas padrão locais');
-        // Usar contas locais para o usuário poder usar o app
-        finalAccounts = INITIAL_ACCOUNTS;
+        console.log('🌱 Nenhuma conta encontrada, criando contas padrão no Firebase...');
+        const createdAccounts: Account[] = [];
+
+        for (const acc of INITIAL_ACCOUNTS) {
+          try {
+            // Timeout de 5 segundos por conta
+            const createPromise = firebaseService.createAccount(acc.name, acc.type);
+            const timeoutPromise = new Promise<null>((resolve) =>
+              setTimeout(() => resolve(null), 5000)
+            );
+
+            const result = await Promise.race([createPromise, timeoutPromise]);
+            if (result) {
+              createdAccounts.push(result);
+              console.log('✅ Conta criada:', result.name);
+            } else {
+              console.warn('⏱️ Timeout ao criar conta:', acc.name);
+            }
+          } catch (e) {
+            console.error('❌ Erro ao criar conta:', acc.name, e);
+          }
+        }
+
+        // Se conseguiu criar algumas contas, usar elas. Senão, usar locais.
+        if (createdAccounts.length > 0) {
+          finalAccounts = createdAccounts;
+          console.log('✅ Total de contas criadas:', createdAccounts.length);
+        } else {
+          console.log('⚠️ Não foi possível criar contas, usando locais temporariamente');
+          finalAccounts = INITIAL_ACCOUNTS;
+        }
       }
+
 
       setTransactions(txs);
       setAccounts(finalAccounts);
