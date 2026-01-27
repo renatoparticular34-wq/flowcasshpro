@@ -46,33 +46,29 @@ const FlowCashApp: React.FC = () => {
     setDataLoading(true);
     setLoadingError('');
 
-    // Timeout Promise
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("O carregamento demorou muito. Verifique sua conexão ou as configurações do Firebase.")), 15000)
-    );
-
     try {
-      const loadPromise = Promise.all([
+      console.log('🔄 Iniciando carregamento de dados...');
+
+      const [txs, accs, sets] = await Promise.all([
         firebaseService.getTransactions(),
         firebaseService.getAccounts(),
         firebaseService.getSettings()
       ]);
 
-      const [txs, accs, sets] = await Promise.race([loadPromise, timeout]) as [Transaction[], Account[], AppSettings];
-
-      console.log('Dados carregados:', { txs: txs.length, accs: accs.length, sets });
+      console.log('✅ Dados carregados:', { txs: txs.length, accs: accs.length, sets });
 
       let finalAccounts = accs;
 
       // Seeding: Se não houver contas, criar as padrão
       if (accs.length === 0) {
-        console.log('Criando contas padrão...');
+        console.log('🌱 Criando contas padrão...');
         const createdAccounts = [];
         for (const acc of INITIAL_ACCOUNTS) {
           const newAcc = await firebaseService.createAccount(acc.name, acc.type);
           if (newAcc) createdAccounts.push(newAcc);
         }
         finalAccounts = createdAccounts;
+        console.log('✅ Contas padrão criadas:', finalAccounts.length);
       }
 
       setTransactions(txs);
@@ -84,12 +80,13 @@ const FlowCashApp: React.FC = () => {
       setTempBalanceMonth(new Date().getMonth() + 1);
       setTempBalanceYear(new Date().getFullYear());
     } catch (error: any) {
-      console.error('Failed to load data:', error);
+      console.error('❌ Erro ao carregar dados:', error);
       setLoadingError(error.message || 'Erro ao carregar dados.');
     } finally {
       setDataLoading(false);
     }
   };
+
 
 
   useEffect(() => {
