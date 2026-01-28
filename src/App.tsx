@@ -1,9 +1,8 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { Transaction, Account, AppSettings } from './types';
-import { supabaseService } from './services/supabaseService';
-import { AuthProvider, useAuth } from './components/AuthProvider';
+import { dataService } from './lib/dataService';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { INITIAL_ACCOUNTS, INITIAL_SETTINGS } from './services/mockData';
 
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -15,140 +14,82 @@ import TransactionForm from './components/TransactionForm';
 import Login from './components/Login';
 import { Loader2 } from 'lucide-react';
 
-import { INITIAL_ACCOUNTS } from './services/mockData';
-
 const FlowCashApp: React.FC = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [settings, setSettings] = useState<AppSettings>({
-    companyName: '',
-    initialBalance: 0,
-    email: '',
-    phone: '',
-    address: '',
-    document: ''
-  });
+  const [settings, setSettings] = useState<AppSettings>(INITIAL_SETTINGS);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined);
   const [dataLoading, setDataLoading] = useState(false);
+  const [loadingError, setLoadingError] = useState('');
 
   // Temporary initial balance state (cleared on logout)
   const [tempInitialBalance, setTempInitialBalance] = useState<number | undefined>(undefined);
   const [tempBalanceMonth, setTempBalanceMonth] = useState<number>(new Date().getMonth() + 1);
   const [tempBalanceYear, setTempBalanceYear] = useState<number>(new Date().getFullYear());
 
-
-  const [loadingError, setLoadingError] = useState('');
-
-
   const loadData = async () => {
     if (!user) return;
     setDataLoading(true);
     setLoadingError('');
 
-    // Helper para adicionar timeout a uma Promise
-    const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
-      return Promise.race([
-        promise,
-        new Promise<T>((resolve) => setTimeout(() => {
-          console.warn(`⏱️ Timeout após ${ms}ms, usando fallback`);
-          resolve(fallback);
-        }, ms))
-      ]);
-    };
-
     try {
       console.log('🔄 Iniciando carregamento de dados...');
 
-      // Buscar dados com timeout de 10 segundos cada
+      // Buscar dados
       const [txs, accs, sets] = await Promise.all([
-        withTimeout(supabaseService.getTransactions(), 10000, []),
-        withTimeout(supabaseService.getAccounts(), 10000, []),
-        withTimeout(supabaseService.getSettings(), 10000, {
-          companyName: 'Minha Empresa',
-          initialBalance: 0,
-          email: '',
-          phone: '',
-          address: '',
-          document: ''
-        })
+        dataService.getTransactions(),
+        dataService.getAccounts(),
+        dataService.getSettings()
       ]);
-
 
       console.log('✅ Dados carregados:', { txs: txs.length, accs: accs.length, sets });
 
-      // Se não houver contas, tentar criar no Firebase
+      // Se não houver contas, criar contas padrão
       let finalAccounts = accs;
       if (accs.length === 0) {
-        console.log('🌱 Nenhuma conta encontrada, criando contas padrão no Firebase...');
+        console.log('🌱 Nenhuma conta encontrada, criando contas padrão...');
         const createdAccounts: Account[] = [];
 
         for (const acc of INITIAL_ACCOUNTS) {
           try {
-            // Timeout de 5 segundos por conta
-            const createPromise = supabaseService.createAccount(acc.name, acc.type);
-            const timeoutPromise = new Promise<null>((resolve) =>
-              setTimeout(() => resolve(null), 5000)
-            );
-
-            const result = await Promise.race([createPromise, timeoutPromise]);
+            const result = await dataService.createAccount(acc.name, acc.type);
             if (result) {
               createdAccounts.push(result);
-              console.log('✅ Conta criada:', result.name);
-            } else {
-              console.warn('⏱️ Timeout ao criar conta:', acc.name);
             }
           } catch (e) {
             console.error('❌ Erro ao criar conta:', acc.name, e);
           }
         }
 
-        // Se conseguiu criar algumas contas, usar elas. Senão, usar locais.
         if (createdAccounts.length > 0) {
           finalAccounts = createdAccounts;
-          console.log('✅ Total de contas criadas:', createdAccounts.length);
+          console.log('✅ Contas criadas:', createdAccounts.length);
         } else {
-          console.log('⚠️ Não foi possível criar contas, usando locais temporariamente');
+          // Fallback apenas visual
           finalAccounts = INITIAL_ACCOUNTS;
         }
       }
 
-
       setTransactions(txs);
       setAccounts(finalAccounts);
-      setSettings(sets);
+      // Se as settings do servidor estiverem vazias (default), usa as iniciais
+      setSettings(sets.email ? sets : { ...sets, ...INITIAL_SETTINGS });
 
-      // Clear temporary balance when user logs in
-      setTempInitialBalance(undefined);
-      setTempBalanceMonth(new Date().getMonth() + 1);
-      setTempBalanceYear(new Date().getFullYear());
     } catch (error: any) {
       console.error('❌ Erro ao carregar dados:', error);
-      // Em caso de erro, usar dados locais para não travar o app
-      setAccounts(INITIAL_ACCOUNTS);
-      setSettings({
-        companyName: 'Minha Empresa',
-        initialBalance: 0,
-        email: '',
-        phone: '',
-        address: '',
-        document: ''
-      });
+      setLoadingError(error.message || 'Erro desconhecido');
     } finally {
       setDataLoading(false);
     }
   };
 
-
-
-
   useEffect(() => {
     if (user) {
       loadData();
     } else {
-      // Clear temporary balance when user logs out
       setTempInitialBalance(undefined);
       setTempBalanceMonth(new Date().getMonth() + 1);
       setTempBalanceYear(new Date().getFullYear());
@@ -162,12 +103,14 @@ const FlowCashApp: React.FC = () => {
     const newTxData = {
       ...data,
       type: account.type
-    } as any;
+    };
 
-    const created = await supabaseService.createTransaction(newTxData);
+    const created = await dataService.createTransaction(newTxData);
     if (created) {
       setTransactions([created, ...transactions]);
       setShowAddForm(false);
+    } else {
+      alert('Erro ao criar transação. Tente novamente.');
     }
   };
 
@@ -183,11 +126,13 @@ const FlowCashApp: React.FC = () => {
       type: account.type
     };
 
-    const success = await supabaseService.updateTransaction(updatedTx);
+    const success = await dataService.updateTransaction(updatedTx);
     if (success) {
       setTransactions(transactions.map(t => t.id === updatedTx.id ? updatedTx : t));
       setEditingTransaction(undefined);
       setShowAddForm(false);
+    } else {
+      alert('Erro ao atualizar transação. Tente novamente.');
     }
   };
 
@@ -198,61 +143,47 @@ const FlowCashApp: React.FC = () => {
 
   const handleDeleteTransaction = async (id: string) => {
     if (confirm('Tem certeza que deseja excluir este lançamento?')) {
-      const success = await supabaseService.deleteTransaction(id);
+      const success = await dataService.deleteTransaction(id);
       if (success) {
         setTransactions(transactions.filter(t => t.id !== id));
+      } else {
+        alert('Erro ao excluir transação.');
       }
     }
   };
 
   const handleUpdateAccounts = async (newAccounts: Account[], newSettings: AppSettings) => {
-    await supabaseService.updateSettings(newSettings);
+    await dataService.updateSettings(newSettings);
 
-    // 1. Handle Deletions: Check accounts present in state but missing in newAccounts
     const newIds = new Set(newAccounts.map(a => a.id));
-    const toDelete = accounts.filter(a => !newIds.has(a.id) && !a.id.startsWith('temp_')); // Only delete real IDs that are missing
+    const toDelete = accounts.filter(a => !newIds.has(a.id) && !a.id.startsWith('temp_'));
 
     for (const acc of toDelete) {
-      await supabaseService.deleteAccount(acc.id);
+      await dataService.deleteAccount(acc.id);
     }
 
-    // 2. Handle Creations and Updates
     for (const acc of newAccounts) {
       if (acc.id.startsWith('temp_')) {
-        await supabaseService.createAccount(acc.name, acc.type);
+        await dataService.createAccount(acc.name, acc.type);
       } else {
         const original = accounts.find(a => a.id === acc.id);
         if (original && original.name !== acc.name) {
-          await supabaseService.updateAccount(acc);
+          await dataService.updateAccount(acc);
         }
       }
     }
 
     setSettings(newSettings);
-    loadData(); // This will fetch the new list and trigger re-renders
+    loadData();
   };
 
   const handleUpdateProfile = async (newSettings: AppSettings) => {
-    try {
-      console.log('💾 Salvando perfil:', newSettings.companyName);
-      const success = await supabaseService.updateSettings(newSettings);
-      if (success) {
-        console.log('✅ Perfil salvo com sucesso');
-
-        // Atualiza o estado local primeiro
-        setSettings(newSettings);
-
-        // Mostra o alert de sucesso
-        alert('Perfil atualizado com sucesso!');
-
-        // Não recarrega imediatamente para evitar sobrescrever o estado local
-      } else {
-        console.error('❌ Erro ao salvar configurações');
-        alert('Erro ao salvar as configurações. Tente novamente.');
-      }
-    } catch (error) {
-      console.error('❌ Erro ao atualizar perfil:', error);
-      alert('Erro ao salvar as configurações. Verifique sua conexão e tente novamente.');
+    const success = await dataService.updateSettings(newSettings);
+    if (success) {
+      setSettings(newSettings);
+      alert('Perfil atualizado com sucesso!');
+    } else {
+      alert('Erro ao salvar as configurações.');
     }
   };
 
@@ -267,7 +198,6 @@ const FlowCashApp: React.FC = () => {
   if (!user) {
     return <Login onLogin={() => { }} />;
   }
-
 
   if (dataLoading && transactions.length === 0) {
     return (
@@ -287,9 +217,6 @@ const FlowCashApp: React.FC = () => {
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Ops! Algo deu errado.</h2>
           <p className="text-rose-200/80 mb-6 text-sm">{loadingError}</p>
-          <div className="text-xs text-slate-500 mb-6 bg-slate-900/50 p-3 rounded border border-slate-700">
-            Dica: Verifique se as Variáveis de Ambiente foram configuradas corretamente no Netlify.
-          </div>
           <button
             onClick={() => window.location.reload()}
             className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-6 rounded-lg transition-colors"

@@ -1,4 +1,3 @@
-
 import { Account, AccountType, Transaction, TransactionStatus, AppSettings } from '../types';
 
 export const INITIAL_ACCOUNTS: Account[] = [
