@@ -1,16 +1,35 @@
 import { supabase } from '../lib/supabase';
 import { Transaction, Account, AppSettings, TransactionStatus, AccountType } from '../types';
 
+// Helper function to get the current user's company_id
+async function getCompanyId(): Promise<string | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .single();
+
+    if (error || !profile) {
+        console.error('Erro ao buscar company_id:', error);
+        return null;
+    }
+
+    return profile.company_id;
+}
+
 export const dataService = {
     // --- Transactions ---
     async getTransactions(): Promise<Transaction[]> {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return [];
+        const companyId = await getCompanyId();
+        if (!companyId) return [];
 
         const { data, error } = await supabase
             .from('transactions')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('company_id', companyId)
             .order('date', { ascending: false });
 
         if (error) {
@@ -21,28 +40,28 @@ export const dataService = {
         return (data || []).map(t => ({
             id: t.id,
             date: t.date,
-            accountId: t.account_id,
+            accountId: t.account_id || '',
             description: t.description || '',
             amount: Number(t.amount),
-            status: t.status as TransactionStatus,
-            type: t.type as AccountType,
+            status: t.status === 'SIM' ? TransactionStatus.PAID : TransactionStatus.PENDING,
+            type: t.type === 'Entrada' ? AccountType.INCOME : AccountType.EXPENSE,
         }));
     },
 
     async createTransaction(transaction: Omit<Transaction, 'id'>): Promise<Transaction | null> {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return null;
+        const companyId = await getCompanyId();
+        if (!companyId) return null;
 
         const { data, error } = await supabase
             .from('transactions')
             .insert({
-                user_id: user.id,
-                account_id: transaction.accountId,
+                company_id: companyId,
+                account_id: transaction.accountId || null,
                 date: transaction.date,
                 description: transaction.description,
                 amount: transaction.amount,
-                type: transaction.type,
-                status: transaction.status,
+                type: transaction.type === AccountType.INCOME ? 'Entrada' : 'Saída',
+                status: transaction.status === TransactionStatus.PAID ? 'SIM' : 'NÃO',
             })
             .select()
             .single();
@@ -55,11 +74,11 @@ export const dataService = {
         return {
             id: data.id,
             date: data.date,
-            accountId: data.account_id,
+            accountId: data.account_id || '',
             description: data.description || '',
             amount: Number(data.amount),
-            status: data.status as TransactionStatus,
-            type: data.type as AccountType,
+            status: data.status === 'SIM' ? TransactionStatus.PAID : TransactionStatus.PENDING,
+            type: data.type === 'Entrada' ? AccountType.INCOME : AccountType.EXPENSE,
         };
     },
 
@@ -67,12 +86,12 @@ export const dataService = {
         const { error } = await supabase
             .from('transactions')
             .update({
-                account_id: transaction.accountId,
+                account_id: transaction.accountId || null,
                 date: transaction.date,
                 description: transaction.description,
                 amount: transaction.amount,
-                type: transaction.type,
-                status: transaction.status,
+                type: transaction.type === AccountType.INCOME ? 'Entrada' : 'Saída',
+                status: transaction.status === TransactionStatus.PAID ? 'SIM' : 'NÃO',
             })
             .eq('id', transaction.id);
 
@@ -96,15 +115,15 @@ export const dataService = {
         return true;
     },
 
-    // --- Accounts ---
+    // --- Accounts (accounts_plan table) ---
     async getAccounts(): Promise<Account[]> {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return [];
+        const companyId = await getCompanyId();
+        if (!companyId) return [];
 
         const { data, error } = await supabase
-            .from('accounts')
+            .from('accounts_plan')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('company_id', companyId)
             .order('name');
 
         if (error) {
@@ -115,17 +134,21 @@ export const dataService = {
         return (data || []).map(a => ({
             id: a.id,
             name: a.name,
-            type: a.type as AccountType,
+            type: a.type === 'Entrada' ? AccountType.INCOME : AccountType.EXPENSE,
         }));
     },
 
     async createAccount(name: string, type: AccountType): Promise<Account | null> {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return null;
+        const companyId = await getCompanyId();
+        if (!companyId) return null;
 
         const { data, error } = await supabase
-            .from('accounts')
-            .insert({ user_id: user.id, name, type })
+            .from('accounts_plan')
+            .insert({
+                company_id: companyId,
+                name,
+                type: type === AccountType.INCOME ? 'Entrada' : 'Saída'
+            })
             .select()
             .single();
 
@@ -134,13 +157,20 @@ export const dataService = {
             return null;
         }
 
-        return { id: data.id, name: data.name, type: data.type as AccountType };
+        return {
+            id: data.id,
+            name: data.name,
+            type: data.type === 'Entrada' ? AccountType.INCOME : AccountType.EXPENSE
+        };
     },
 
     async updateAccount(account: Account): Promise<boolean> {
         const { error } = await supabase
-            .from('accounts')
-            .update({ name: account.name, type: account.type })
+            .from('accounts_plan')
+            .update({
+                name: account.name,
+                type: account.type === AccountType.INCOME ? 'Entrada' : 'Saída'
+            })
             .eq('id', account.id);
 
         if (error) {
@@ -152,7 +182,7 @@ export const dataService = {
 
     async deleteAccount(id: string): Promise<boolean> {
         const { error } = await supabase
-            .from('accounts')
+            .from('accounts_plan')
             .delete()
             .eq('id', id);
 
@@ -174,47 +204,59 @@ export const dataService = {
             document: ''
         };
 
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return defaultSettings;
+        const companyId = await getCompanyId();
+        if (!companyId) return defaultSettings;
 
-        const { data, error } = await supabase
-            .from('settings')
-            .select('*')
-            .eq('user_id', user.id)
+        // Get company name
+        const { data: company } = await supabase
+            .from('companies')
+            .select('name')
+            .eq('id', companyId)
             .single();
 
-        if (error || !data) return defaultSettings;
+        // Get settings
+        const { data: settings } = await supabase
+            .from('settings')
+            .select('*')
+            .eq('company_id', companyId)
+            .single();
 
         return {
-            companyName: data.company_name || 'Minha Empresa',
-            initialBalance: Number(data.initial_balance) || 0,
-            email: data.email || '',
-            phone: data.phone || '',
-            address: data.address || '',
-            document: data.document || ''
+            companyName: company?.name || 'Minha Empresa',
+            initialBalance: Number(settings?.initial_balance) || 0,
+            email: '',
+            phone: '',
+            address: '',
+            document: ''
         };
     },
 
     async updateSettings(settings: AppSettings): Promise<boolean> {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return false;
+        const companyId = await getCompanyId();
+        if (!companyId) return false;
 
-        const { error } = await supabase
-            .from('settings')
-            .upsert({
-                user_id: user.id,
-                company_name: settings.companyName,
-                initial_balance: settings.initialBalance,
-                email: settings.email,
-                phone: settings.phone,
-                address: settings.address,
-                document: settings.document,
-            }, { onConflict: 'user_id' });
+        // Update company name
+        const { error: companyError } = await supabase
+            .from('companies')
+            .update({ name: settings.companyName })
+            .eq('id', companyId);
 
-        if (error) {
-            console.error('Erro ao atualizar configurações:', error);
+        if (companyError) {
+            console.error('Erro ao atualizar empresa:', companyError);
             return false;
         }
+
+        // Update settings (initial_balance)
+        const { error: settingsError } = await supabase
+            .from('settings')
+            .update({ initial_balance: settings.initialBalance })
+            .eq('company_id', companyId);
+
+        if (settingsError) {
+            console.error('Erro ao atualizar configurações:', settingsError);
+            return false;
+        }
+
         return true;
     }
 };
