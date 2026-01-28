@@ -15,7 +15,7 @@ import Login from './components/Login';
 import { Loader2 } from 'lucide-react';
 
 const FlowCashApp: React.FC = () => {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, isPasswordRecovery } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -195,7 +195,7 @@ const FlowCashApp: React.FC = () => {
     );
   }
 
-  if (!user) {
+  if (!user || isPasswordRecovery) {
     return <Login onLogin={() => { }} />;
   }
 
