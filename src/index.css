@@ -70,21 +70,127 @@ body {
 }
 
 @media print {
-
+  /* Ocultar elementos não necessários na impressão */
   aside,
   button,
-  .no-print {
+  .no-print,
+  nav,
+  header {
     display: none !important;
   }
 
-  main {
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
+  /* Reset completo do layout */
+  * {
+    box-sizing: border-box;
   }
 
-  body,
+  html,
+  body {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   #root {
-    background: white;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  main,
+  .main-content {
+    margin: 0 !important;
+    padding: 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Ajustar tabela para caber na página */
+  table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    font-size: 10px !important;
+    border-collapse: collapse !important;
+  }
+
+  th,
+  td {
+    padding: 6px 8px !important;
+    font-size: 10px !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  /* Coluna de data - mais estreita */
+  th:first-child,
+  td:first-child {
+    width: 12% !important;
+  }
+
+  /* Coluna de conta */
+  th:nth-child(2),
+  td:nth-child(2) {
+    width: 18% !important;
+  }
+
+  /* Coluna de descrição - mais larga */
+  th:nth-child(3),
+  td:nth-child(3) {
+    width: 30% !important;
+  }
+
+  /* Coluna de status */
+  th:nth-child(4),
+  td:nth-child(4) {
+    width: 12% !important;
+  }
+
+  /* Coluna de valor */
+  th:nth-child(5),
+  td:nth-child(5) {
+    width: 15% !important;
+    text-align: right !important;
+  }
+
+  /* Ocultar coluna de ações */
+  th:last-child,
+  td:last-child {
+    display: none !important;
+  }
+
+  /* Remover scroll horizontal */
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+
+  /* Cards e containers */
+  .rounded-2xl,
+  .rounded-xl {
+    border-radius: 4px !important;
+    box-shadow: none !important;
+  }
+
+  /* Preservar cores de status */
+  .bg-emerald-100,
+  .bg-orange-100 {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Título da página */
+  h1 {
+    font-size: 16px !important;
+    margin-bottom: 10px !important;
+  }
+
+  /* Forçar quebra de página se necessário */
+  tr {
+    page-break-inside: avoid;
   }
 }

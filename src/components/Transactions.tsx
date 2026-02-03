@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Transaction, Account, TransactionStatus, AccountType } from '../types';
-import { Plus, Search, Filter, Trash2, Edit3, ArrowUpCircle, ArrowDownCircle, AlertCircle, AlertTriangle, Printer } from 'lucide-react';
+import { Plus, Search, Filter, Trash2, Edit3, ArrowUpCircle, ArrowDownCircle, AlertCircle, AlertTriangle, Printer, Calendar } from 'lucide-react';
 
 interface TransactionsProps {
   transactions: Transaction[];
@@ -20,6 +20,13 @@ interface TransactionsProps {
 // Função simples para formatar valor numérico para exibição (sem R$)
 const formatCurrencyValue = (value: number): string => {
   return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Função para formatar data corretamente sem problema de fuso horário
+const formatDateBR = (dateString: string): string => {
+  // Parse a data como local (não UTC) para evitar deslocamento de fuso
+  const [year, month, day] = dateString.split('-').map(Number);
+  return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
 };
 
 const Transactions: React.FC<TransactionsProps> = ({
@@ -50,6 +57,8 @@ const Transactions: React.FC<TransactionsProps> = ({
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | AccountType>('ALL');
   const [filterStatus, setFilterStatus] = useState<'ALL' | TransactionStatus>('ALL');
+  const [filterDateStart, setFilterDateStart] = useState<string>('');
+  const [filterDateEnd, setFilterDateEnd] = useState<string>('');
 
   const filtered = transactions
     .filter(t => {
@@ -57,7 +66,17 @@ const Transactions: React.FC<TransactionsProps> = ({
         accounts.find(a => a.id === t.accountId)?.name.toLowerCase().includes(search.toLowerCase());
       const matchType = filterType === 'ALL' || t.type === filterType;
       const matchStatus = filterStatus === 'ALL' || t.status === filterStatus;
-      return matchSearch && matchType && matchStatus;
+
+      // Filtro por período
+      let matchDateRange = true;
+      if (filterDateStart) {
+        matchDateRange = matchDateRange && t.date >= filterDateStart;
+      }
+      if (filterDateEnd) {
+        matchDateRange = matchDateRange && t.date <= filterDateEnd;
+      }
+
+      return matchSearch && matchType && matchStatus && matchDateRange;
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -165,36 +184,75 @@ const Transactions: React.FC<TransactionsProps> = ({
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-          <input
-            type="text"
-            placeholder="Buscar por descrição ou conta..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
-          />
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4 no-print">
+        {/* Linha 1: Busca e Status */}
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Buscar por descrição ou conta..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+          </div>
+          <div className="flex gap-4 flex-wrap">
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value as any)}
+              className="px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-700"
+            >
+              <option value="ALL">Todos Tipos</option>
+              <option value={AccountType.INCOME}>Entradas</option>
+              <option value={AccountType.EXPENSE}>Saídas</option>
+            </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as any)}
+              className="px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-700"
+            >
+              <option value="ALL">Status</option>
+              <option value={TransactionStatus.PAID}>Realizados</option>
+              <option value={TransactionStatus.PENDING}>Provisões</option>
+            </select>
+          </div>
         </div>
-        <div className="flex gap-4">
-          <select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value as any)}
-            className="px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-700"
-          >
-            <option value="ALL">Todos Tipos</option>
-            <option value={AccountType.INCOME}>Entradas</option>
-            <option value={AccountType.EXPENSE}>Saídas</option>
-          </select>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as any)}
-            className="px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-slate-700"
-          >
-            <option value="ALL">Status</option>
-            <option value={TransactionStatus.PAID}>Realizados</option>
-            <option value={TransactionStatus.PENDING}>Provisões</option>
-          </select>
+
+        {/* Linha 2: Filtro por Período */}
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2 text-slate-500">
+            <Calendar className="w-5 h-5" />
+            <span className="text-sm font-medium">Período:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-500">De:</label>
+              <input
+                type="date"
+                value={filterDateStart}
+                onChange={(e) => setFilterDateStart(e.target.value)}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium text-slate-700"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-500">Até:</label>
+              <input
+                type="date"
+                value={filterDateEnd}
+                onChange={(e) => setFilterDateEnd(e.target.value)}
+                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium text-slate-700"
+              />
+            </div>
+            {(filterDateStart || filterDateEnd) && (
+              <button
+                onClick={() => { setFilterDateStart(''); setFilterDateEnd(''); }}
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold px-3 py-2 bg-indigo-50 rounded-lg transition-colors"
+              >
+                Limpar datas
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -215,7 +273,7 @@ const Transactions: React.FC<TransactionsProps> = ({
               {filtered.map((t) => (
                 <tr key={t.id} className={`${t.status === TransactionStatus.PENDING ? 'bg-orange-50/50' : 'hover:bg-slate-50'} transition-colors group`}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 font-medium">
-                    {new Date(t.date).toLocaleDateString('pt-BR')}
+                    {formatDateBR(t.date)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">

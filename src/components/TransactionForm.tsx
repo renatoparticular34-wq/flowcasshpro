@@ -9,14 +9,27 @@ interface TransactionFormProps {
   initialData?: Transaction;
 }
 
+// Função para obter a data local no formato YYYY-MM-DD
+const getLocalDateString = (date: Date = new Date()): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, onSubmit, onClose, initialData }) => {
   const [formData, setFormData] = useState({
-    date: initialData?.date || new Date().toISOString().split('T')[0],
+    date: initialData?.date || getLocalDateString(),
     accountId: initialData?.accountId || '',
     description: initialData?.description || '',
     amount: initialData?.amount || 0,
     status: initialData?.status || TransactionStatus.PENDING,
   });
+
+  // Estado para controlar exibição do valor no campo
+  const [amountDisplay, setAmountDisplay] = useState<string>(
+    initialData?.amount ? String(initialData.amount) : ''
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,8 +108,25 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, onSubmit, o
                 step="0.01"
                 required
                 placeholder="0,00"
-                value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+                value={amountDisplay}
+                onFocus={(e) => {
+                  // Se o valor for 0 ou vazio, limpa para facilitar digitação
+                  if (formData.amount === 0 || amountDisplay === '0' || amountDisplay === '') {
+                    setAmountDisplay('');
+                  }
+                  e.target.select();
+                }}
+                onBlur={() => {
+                  // Se ficar vazio, mostra string vazia (placeholder aparece)
+                  if (amountDisplay === '' || parseFloat(amountDisplay) === 0) {
+                    setAmountDisplay('');
+                    setFormData({ ...formData, amount: 0 });
+                  }
+                }}
+                onChange={(e) => {
+                  setAmountDisplay(e.target.value);
+                  setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 });
+                }}
                 className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-lg font-bold"
               />
             </div>
@@ -108,22 +138,20 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ accounts, onSubmit, o
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, status: TransactionStatus.PAID })}
-                className={`py-2 px-3 rounded-xl border font-bold transition-all text-sm ${
-                  formData.status === TransactionStatus.PAID
+                className={`py-2 px-3 rounded-xl border font-bold transition-all text-sm ${formData.status === TransactionStatus.PAID
                     ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
                     : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-300'
-                }`}
+                  }`}
               >
                 Realizado
               </button>
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, status: TransactionStatus.PENDING })}
-                className={`py-2 px-3 rounded-xl border font-bold transition-all text-sm ${
-                  formData.status === TransactionStatus.PENDING
+                className={`py-2 px-3 rounded-xl border font-bold transition-all text-sm ${formData.status === TransactionStatus.PENDING
                     ? 'bg-orange-50 border-orange-500 text-orange-700'
                     : 'bg-white border-slate-200 text-slate-600 hover:border-orange-300'
-                }`}
+                  }`}
               >
                 Pendente
               </button>
