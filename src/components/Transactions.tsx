@@ -220,10 +220,10 @@ const Transactions: React.FC<TransactionsProps> = ({
         </div>
 
         {/* Linha 2: Filtro por Período */}
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 pt-2 border-t border-slate-100">
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 pt-4 border-t border-slate-100">
           <div className="flex items-center gap-2 text-slate-500">
             <Calendar className="w-5 h-5" />
-            <span className="text-sm font-medium">Período:</span>
+            <span className="text-sm font-medium">Filtrar por Período:</span>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
@@ -232,7 +232,7 @@ const Transactions: React.FC<TransactionsProps> = ({
                 type="date"
                 value={filterDateStart}
                 onChange={(e) => setFilterDateStart(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium text-slate-700"
+                className="px-3 py-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm font-medium text-slate-700"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -241,18 +241,37 @@ const Transactions: React.FC<TransactionsProps> = ({
                 type="date"
                 value={filterDateEnd}
                 onChange={(e) => setFilterDateEnd(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium text-slate-700"
+                className="px-3 py-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm font-medium text-slate-700"
               />
             </div>
             {(filterDateStart || filterDateEnd) && (
               <button
                 onClick={() => { setFilterDateStart(''); setFilterDateEnd(''); }}
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold px-3 py-2 bg-indigo-50 rounded-lg transition-colors"
+                className="text-xs text-rose-600 hover:text-rose-800 font-semibold px-3 py-2 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors"
               >
-                Limpar datas
+                ✕ Limpar datas
               </button>
             )}
           </div>
+        </div>
+
+        {/* Contador de resultados e indicador de filtro ativo */}
+        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-700">
+              {filtered.length} {filtered.length === 1 ? 'movimento encontrado' : 'movimentos encontrados'}
+            </span>
+            {(filterDateStart || filterDateEnd || filterType !== 'ALL' || filterStatus !== 'ALL' || search) && (
+              <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-medium">
+                Filtros ativos
+              </span>
+            )}
+          </div>
+          {(filterDateStart || filterDateEnd) && (
+            <span className="text-xs text-emerald-600 font-medium animate-pulse">
+              ✓ Filtro aplicado automaticamente
+            </span>
+          )}
         </div>
       </div>
 
